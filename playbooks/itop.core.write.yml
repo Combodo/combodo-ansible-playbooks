@@ -50,6 +50,15 @@
         - not item
         - item is none
 
+    # Build a string to use as the control list from
+    # the 'fields' dictionary, instead of requesting a (possibly
+    # wrong) 'output_fields'
+    # The changes are minimal, so, even if not used, 'output_fields'
+    # is still required
+    - name: Build control list
+      ansible.builtin.set_fact:
+        fields_list: "{{ fields.keys() | join(', ') }}"
+        
     - name: Check if CI exists
       block:
         - name: Call operation core/get
@@ -63,7 +72,7 @@
               "operation":"core/get",
               "class":"{{ obj_class }}",
               "key":{{ key | to_json }},
-              "output_fields":"{{ output_fields }}"
+              "output_fields":"{{ fields_list }}"
               }
             return_content: true
           register: response
@@ -94,7 +103,9 @@
           vars:
             param: 'objects.*.fields'
 
+    # the 'when:' before the 'block:' change to please the linter
     - name: Create CI
+      when: obj_key == "0" or obj_key == ""
       block:
         - name: Call operation core/create
           ansible.builtin.uri:
@@ -108,7 +119,7 @@
               "comment":"{{ comment_for_create }}",
               "class":"{{ obj_class }}",
               "fields":{{ fields | to_json }},
-              "output_fields":"{{ output_fields }}"
+              "output_fields":"{{ fields_list }}"
               }
             return_content: true
           register: response
@@ -131,9 +142,9 @@
           ansible.builtin.set_fact:
             operation: "{{ 'created' }}"
           changed_when: code == "0"
-      when: obj_key == "0" or obj_key == ""
 
     - name: Update CI
+      when: obj_key != "0" and obj_key != ""
       block:
         - name: Call operation core/update
           ansible.builtin.uri:
@@ -148,7 +159,7 @@
               "class":"{{ obj_class }}",
               "key":{{ key | to_json }},
               "fields":{{ fields | to_json }},
-              "output_fields":"{{ output_fields }}"
+              "output_fields":"{{ fields_list }}"
               }
             return_content: true
           register: response
@@ -177,7 +188,6 @@
           ansible.builtin.set_fact:
             operation: "{{ 'updated' }}"
           changed_when: get_fields != set_fields
-      when: obj_key != "0" and obj_key != ""
 
     - name: Operation is successful at this stage
       block:
